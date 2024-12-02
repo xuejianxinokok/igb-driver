@@ -15,9 +15,9 @@ log = "0.4"
 dma-api = "0.1"
 
 [dev-dependencies]
-bare-test = "0.1"
+bare-test = "0.1.4"
 pcie = "0.2"
 byte-unit = { version = "5.1.6", default-features = false, features = ["byte"] }
 
 [build-dependencies]
-sparreal-macros = "0.0.5"
+bare-test-macros = "0.0.1"
