@@ -75,6 +75,15 @@ Cache-Control: no-cache, no-store, must-revalidate
 
 ### Make 方式
 
+在linux系统下可使用make方式运行，需修改arceos目录下Makefile文件，更改 Qemu 模拟网卡为 igb。
+
+将`qemu_args-$(NET)`的参数，由`-device virtio-net-$(vdev-suffix),netdev=net0`修改为`-device igb,netdev=net0`。
+
+在arceos目录下运行make命令：
+```bash
+make A=examples/httpclient PLATFORM=aarch64-qemu-virt LOG=debug SMP=2 NET=y NET_DEV=user run
+```
+
 ### ostool 方式
 
 修改`.project.toml`，`[compile]`字段中，修改 `features = ["axstd/log-level-debug", "axstd/smp"]`，使输出日志为`debug`级别。
