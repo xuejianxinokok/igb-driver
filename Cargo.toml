@@ -1,0 +1,23 @@
+[package]
+name = "igb-driver"
+version = "0.1.0"
+edition = "2021"
+authors = ["周睿 <zrufo747@outlook.com>"]
+description = "A simple Igb driver"
+repository = "https://github.com/qclic/igb-driver"
+license = "MIT"
+keywords = ["os", "nic", "igb", "driver"]
+categories = ["embedded", "no-std"]
+
+[dependencies]
+tock-registers = "0.9.0"
+log = "0.4"
+dma-api = "0.1"
+
+[dev-dependencies]
+bare-test = "0.1"
+pcie = "0.2"
+byte-unit = { version = "5.1.6", default-features = false, features = ["byte"] }
+
+[build-dependencies]
+sparreal-macros = "0.0.5"
