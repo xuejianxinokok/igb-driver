@@ -6,17 +6,17 @@
 
 ## ArceOS
 
-### Linux 开发环境
+### Linux make 开发环境
 
 可参照官方网站：[ArceOS Github](https://github.com/arceos-org/arceos)
 
 我们选择在 `APP=examples/httpclient` 的环境下进行测试。
 
-### Windows 开发环境(实验性)
+### OSTool 开发环境(实验性)
 
-目前可实验性支持Windows下编译和Qemu运行ArceOS，相较于Linux开发环境，需要对ArceOS的配置有更深入的了解。
+可支持Linux或Windows下编译和Qemu运行ArceOS，相较于现有make脚本，需要对ArceOS的配置有更深入的了解。
 
-参照 Qemu 官网，安装 msys2 版 qemu.
+参照 Qemu 官网安装，Windows 需安装 msys2 版 qemu.
 
 安装开发工具
 
@@ -105,3 +105,7 @@ No NIC device found!
 ```
 
 其中 PCI 00:01.0 就是Igb网卡，由于我们还没有驱动，所以未发现网卡。
+
+## 参考链接
+
+[1] [Intel IGB Driver](https://github.com/intel/ethernet-linux-igb)
