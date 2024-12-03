@@ -80,6 +80,7 @@ Cache-Control: no-cache, no-store, must-revalidate
 将`qemu_args-$(NET)`的参数，由`-device virtio-net-$(vdev-suffix),netdev=net0`修改为`-device igb,netdev=net0`。
 
 在arceos目录下运行make命令：
+
 ```bash
 make A=examples/httpclient PLATFORM=aarch64-qemu-virt LOG=debug SMP=2 NET=y NET_DEV=user run
 ```
