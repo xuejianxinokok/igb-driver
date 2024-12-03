@@ -118,3 +118,5 @@ No NIC device found!
 ## 参考链接
 
 [1] [Intel IGB Driver](https://github.com/intel/ethernet-linux-igb)
+
+[2] [Intel 82576 Gigabit Ethernet Controller Datasheet](https://www.intel.com/content/dam/www/public/us/en/documents/datasheets/82576eb-gigabit-ethernet-controller-datasheet.pdf)
