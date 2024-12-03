@@ -75,7 +75,7 @@ Cache-Control: no-cache, no-store, must-revalidate
 
 ### Make 方式
 
-在linux系统下可使用make方式运行，需修改arceos目录下Makefile文件，更改 Qemu 模拟网卡为 igb。
+在linux系统下可使用make方式运行，需修改arceos/scripts/make目录下qemu.mk文件，更改 Qemu 模拟网卡为 igb。
 
 将`qemu_args-$(NET)`的参数，由`-device virtio-net-$(vdev-suffix),netdev=net0`修改为`-device igb,netdev=net0`。
 
