@@ -22,6 +22,8 @@ fn it_works1() {
 #[test_case]
 fn test_uart() {
     let igb = get_igb();
+
+    debug!("igb start");
 }
 
 fn get_igb() -> Igb {
@@ -96,6 +98,5 @@ fn get_igb() -> Igb {
             }
         }
     }
-
     panic!("no igb found");
 }

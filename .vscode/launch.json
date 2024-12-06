@@ -17,7 +17,7 @@
             "processCreateCommands": [
                 "gdb-remote localhost:1234" // Connect to the GDB Server
             ],
-            "preLaunchTask": "build test"
+            "preLaunchTask": "debug test"
         }
     ]
 }

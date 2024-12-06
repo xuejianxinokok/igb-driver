@@ -6,7 +6,7 @@ Rust 实现的 Igb 网卡驱动
 
 ```bash
 cargo install ostool
-cargo test --test tests --  --show-output
+cargo test --test test --  --show-output
 ```
 
 ## 参考资料
