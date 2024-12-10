@@ -9,21 +9,24 @@ extern crate alloc;
 use bare_test::{driver::device_tree::get_device_tree, fdt::PciSpace, mem::mmu::iomap, println};
 use igb_driver::Igb;
 use log::{debug, info};
+use nb::block;
 use pcie::*;
 
 bare_test::test_setup!();
 
 #[test_case]
-fn it_works1() {
-    println!("test1... ");
-    assert_eq!(1, 1);
-}
+fn test_work() {
+    let mut igb = get_igb();
 
-#[test_case]
-fn test_uart() {
-    let igb = get_igb();
+    debug!("igb init");
 
-    debug!("igb start");
+    block!(igb.open()).unwrap();
+
+    let mac = igb.mac();
+
+    debug!("igb opened");
+
+    debug!("mac: {:x?}", mac);
 }
 
 fn get_igb() -> Igb {
@@ -93,7 +96,7 @@ fn get_igb() -> Igb {
 
                 let addr = iomap(bar_addr.into(), bar_size);
 
-                let igb = Igb::new(addr);
+                let igb = Igb::new(addr).unwrap();
                 return igb;
             }
         }

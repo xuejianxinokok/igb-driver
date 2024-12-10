@@ -1,35 +1,97 @@
-use core::ptr::NonNull;
+use core::{convert::Infallible, ptr::NonNull};
 
 use log::debug;
 
-pub struct Igb {}
+use crate::{
+    descriptor::{AdvRxDesc, AdvTxDesc},
+    err::IgbError,
+    regs::{Reg, CTRL, RCTL},
+    ring::{Ring, DEFAULT_RING_SIZE},
+};
+
+pub struct Igb {
+    reg: Reg,
+    machine: Machine,
+    tx_ring: Ring<AdvTxDesc>,
+    rx_ring: Ring<AdvRxDesc>,
+}
 
 impl Igb {
-    pub fn new(bar0: NonNull<u8>) -> Self {
-        unsafe {
-            let ctr = 1 << 26;
+    pub fn new(bar0: NonNull<u8>) -> Result<Self, IgbError> {
+        let reg = Reg::new(bar0);
+        let tx_ring = Ring::new(reg, DEFAULT_RING_SIZE)?;
+        let rx_ring = Ring::new(reg, DEFAULT_RING_SIZE)?;
 
-            bar0.cast::<u32>().write_volatile(ctr);
+        Ok(Self {
+            reg,
+            machine: Machine::Init,
+            tx_ring,
+            rx_ring,
+        })
+    }
 
-            debug!("wait reset");
+    pub fn open(&mut self) -> nb::Result<(), IgbError> {
+        match self.machine {
+            Machine::Init => {
+                self.reg.disable_interrupts();
 
-            loop {
-                let ctr = bar0.cast::<u32>().read_volatile();
-                if ctr & (1 << 26) == 0 {
-                    break;
-                }
+                self.reg.modify_reg::<CTRL>(|ctrl| ctrl | CTRL::RST);
+
+                self.machine = Machine::WaitForRst;
+                Err(nb::Error::WouldBlock)
             }
 
-            debug!("reset");
-
-            let status = bar0.cast::<u32>().read_volatile();
-            let fd = status & 1;
-            let lu = status & 1 << 1;
-            let speed = status & 0b11 << 6;
-
-            debug!("igb status: fd: {}, lu: {}, speed: {}", fd, lu, speed);
+            Machine::WaitForRst => {
+                if self.reg.read_reg::<CTRL>().contains(CTRL::RST) {
+                    // wait for reset to complete
+                    Err(nb::Error::WouldBlock)
+                } else {
+                    self.after_reset()
+                }
+            }
+            _ => Ok(()),
         }
-
-        Self {}
     }
+
+    fn after_reset(&mut self) -> nb::Result<(), IgbError> {
+        self.reg.disable_interrupts();
+
+        self.setup_phy_and_the_link()?;
+
+        self.init_stat();
+
+        self.init_rx();
+        self.init_tx();
+
+        //self.enable_interrupts();
+
+        self.machine = Machine::Opened;
+        Ok(())
+    }
+
+    fn init_stat(&mut self) {}
+
+    fn init_rx(&mut self) {
+        // disable rx when configing.
+        self.reg.modify_reg::<RCTL>(|rctl| rctl ^ RCTL::RXEN);
+
+        self.rx_ring.init();
+    }
+
+    fn init_tx(&mut self) {}
+
+    fn setup_phy_and_the_link(&mut self) -> Result<(), IgbError> {
+        Ok(())
+    }
+
+    pub fn mac(&self) -> [u8; 6] {
+        self.reg.read_mac()
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+enum Machine {
+    Init,
+    WaitForRst,
+    Opened,
 }
