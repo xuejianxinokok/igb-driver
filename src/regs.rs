@@ -1,6 +1,8 @@
-use core::ptr::NonNull;
+use core::{convert::Infallible, ptr::NonNull};
 
 use bitflags::{bitflags, Flags};
+
+use crate::err::IgbError;
 
 pub const STATUS: u32 = 0x00008;
 
@@ -44,6 +46,14 @@ impl Reg {
     pub fn modify_reg<F: FlagReg>(&self, f: impl Fn(F) -> F) {
         let old = self.read_reg::<F>();
         self.write_reg(f(old));
+    }
+
+    pub fn wait_for<R: FlagReg, F: Fn(R) -> bool>(&self, f: F) -> nb::Result<(), IgbError> {
+        if f(self.read_reg::<R>()) {
+            Ok(())
+        } else {
+            Err(nb::Error::WouldBlock)
+        }
     }
 
     /// Disable all interrupts for all queues.

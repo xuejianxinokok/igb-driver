@@ -64,13 +64,13 @@ pub struct HsRss {
 #[derive(Clone, Copy)]
 #[repr(C)]
 pub union HiDword {
-    rss: u32, // RSS Hash
-    csum_ip: CsumIp,
+    pub rss: u32, // RSS Hash
+    pub csum_ip: CsumIp,
 }
 
 #[derive(Clone, Copy)]
 #[repr(C)]
 pub struct CsumIp {
-    ip_id: u16, // IP id
-    csum: u16,  // Packet Checksum
+    pub ip_id: u16, // IP id
+    pub csum: u16,  // Packet Checksum
 }

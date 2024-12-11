@@ -35,19 +35,17 @@ impl Igb {
             Machine::Init => {
                 self.reg.disable_interrupts();
 
-                self.reg.modify_reg::<CTRL>(|ctrl| ctrl | CTRL::RST);
+                self.reg.modify_reg(|ctrl: CTRL| ctrl | CTRL::RST);
 
                 self.machine = Machine::WaitForRst;
+
                 Err(nb::Error::WouldBlock)
             }
 
             Machine::WaitForRst => {
-                if self.reg.read_reg::<CTRL>().contains(CTRL::RST) {
-                    // wait for reset to complete
-                    Err(nb::Error::WouldBlock)
-                } else {
-                    self.after_reset()
-                }
+                self.reg.wait_for(|reg: CTRL| !reg.contains(CTRL::RST))?;
+
+                self.after_reset()
             }
             _ => Ok(()),
         }
@@ -69,7 +67,9 @@ impl Igb {
         Ok(())
     }
 
-    fn init_stat(&mut self) {}
+    fn init_stat(&mut self) {
+        //TODO
+    }
 
     fn init_rx(&mut self) {
         // disable rx when configing.
@@ -78,7 +78,9 @@ impl Igb {
         self.rx_ring.init();
     }
 
-    fn init_tx(&mut self) {}
+    fn init_tx(&mut self) {
+        self.tx_ring.init();
+    }
 
     fn setup_phy_and_the_link(&mut self) -> Result<(), IgbError> {
         Ok(())
