@@ -1,3 +1,5 @@
+#![allow(non_camel_case_types)]
+
 use core::{convert::Infallible, ptr::NonNull, time::Duration};
 
 use bitflags::{bitflags, Flags};
@@ -166,6 +168,17 @@ impl FlagReg for STATUS {
 }
 
 bitflags! {
+    pub struct CTRL_EXT: u32 {
+        const EE_RST = 1 << 13;
+        const DRV_LOAD = 1 << 28;
+    }
+}
+
+impl FlagReg for CTRL_EXT {
+    const REG: u32 = 0x18;
+}
+
+bitflags! {
     pub struct RCTL: u32 {
         const RST  = 0x00000001;        // Software reset
         const RXEN = 0x00000002;        // Receiver Enable. 0=disabled; 1=enabled
@@ -201,6 +214,16 @@ bitflags! {
 
 impl FlagReg for RCTL {
     const REG: u32 = 0x00100;
+}
+
+bitflags! {
+    pub struct TCTL: u32 {
+        const EN = 0x00000002;        // Receiver Enable. 0=disabled; 1=enabled
+    }
+}
+
+impl FlagReg for TCTL {
+    const REG: u32 = 0x00400;
 }
 
 bitflags! {

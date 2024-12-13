@@ -6,14 +6,13 @@
 
 extern crate alloc;
 
-use core::{hint::spin_loop, time::Duration};
+use core::time::Duration;
 
 use bare_test::{
     driver::device_tree::get_device_tree, fdt::PciSpace, mem::mmu::iomap, println, time::delay,
 };
 use igb_driver::Igb;
 use log::{debug, info};
-use nb::block;
 use pcie::*;
 
 bare_test::test_setup!();
@@ -33,17 +32,21 @@ fn test_work() {
     debug!("mac: {:x?}", mac);
 
     while !igb.status().link_up {
-        delay(Duration::from_millis(10));
+        sleep(Duration::from_millis(10));
     }
 
     info!("status: {:?}", igb.status());
+}
+
+fn sleep(duration: Duration) {
+    spin_on::spin_on(delay(duration));
 }
 
 struct KernelImpl;
 
 impl igb_driver::Kernel for KernelImpl {
     fn sleep(duration: Duration) {
-        delay(duration);
+        sleep(duration);
     }
 }
 

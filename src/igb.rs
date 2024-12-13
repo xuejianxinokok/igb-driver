@@ -6,7 +6,7 @@ use crate::{
     descriptor::{AdvRxDesc, AdvTxDesc},
     err::IgbError,
     phy::Phy,
-    regs::{Reg, CTRL, RCTL, STATUS},
+    regs::{Reg, CTRL, CTRL_EXT, RCTL, STATUS, TCTL},
     ring::{Ring, DEFAULT_RING_SIZE},
 };
 
@@ -43,7 +43,8 @@ impl Igb {
         )?;
         self.reg.disable_interrupts();
 
-        debug!("{:?}", self.status());
+        self.reg
+            .modify_reg(|reg: CTRL_EXT| CTRL_EXT::DRV_LOAD | reg);
 
         self.setup_phy_and_the_link()?;
 
@@ -74,7 +75,11 @@ impl Igb {
     }
 
     fn init_tx(&mut self) {
+        self.reg.write_reg(TCTL::empty());
+
         self.tx_ring.init();
+
+        self.reg.write_reg(TCTL::EN);
     }
 
     fn setup_phy_and_the_link(&mut self) -> Result<(), IgbError> {
