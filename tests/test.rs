@@ -6,7 +6,11 @@
 
 extern crate alloc;
 
-use bare_test::{driver::device_tree::get_device_tree, fdt::PciSpace, mem::mmu::iomap, println};
+use core::{hint::spin_loop, time::Duration};
+
+use bare_test::{
+    driver::device_tree::get_device_tree, fdt::PciSpace, mem::mmu::iomap, println, time::delay,
+};
 use igb_driver::Igb;
 use log::{debug, info};
 use nb::block;
@@ -20,14 +24,30 @@ fn test_work() {
 
     debug!("igb init");
 
-    block!(igb.open()).unwrap();
+    igb.open().unwrap();
 
     let mac = igb.mac();
 
     debug!("igb opened");
 
     debug!("mac: {:x?}", mac);
+
+    while !igb.status().link_up {
+        delay(Duration::from_millis(10));
+    }
+
+    info!("status: {:?}", igb.status());
 }
+
+struct KernelImpl;
+
+impl igb_driver::Kernel for KernelImpl {
+    fn sleep(duration: Duration) {
+        delay(duration);
+    }
+}
+
+igb_driver::set_impl!(KernelImpl);
 
 fn get_igb() -> Igb {
     let fdt = get_device_tree().unwrap();

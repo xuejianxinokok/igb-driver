@@ -1,12 +1,9 @@
-use core::{convert::Infallible, ptr::NonNull};
+use core::{convert::Infallible, ptr::NonNull, time::Duration};
 
 use bitflags::{bitflags, Flags};
 
-use crate::err::IgbError;
+use crate::{err::IgbError, sleep};
 
-pub const STATUS: u32 = 0x00008;
-
-pub const MDIC: u32 = 0x00020;
 pub const EIMS: u32 = 0x01524;
 pub const EIMC: u32 = 0x01528;
 pub const EICR: u32 = 0x01580;
@@ -36,7 +33,7 @@ impl Reg {
     }
 
     pub fn read_reg<F: FlagReg>(&self) -> F {
-        F::from_bits_truncate(self.read_32(F::REG))
+        F::from_bits_retain(self.read_32(F::REG))
     }
 
     pub fn write_reg<F: FlagReg>(&self, val: F) {
@@ -48,12 +45,20 @@ impl Reg {
         self.write_reg(f(old));
     }
 
-    pub fn wait_for<R: FlagReg, F: Fn(R) -> bool>(&self, f: F) -> nb::Result<(), IgbError> {
-        if f(self.read_reg::<R>()) {
-            Ok(())
-        } else {
-            Err(nb::Error::WouldBlock)
+    pub fn wait_for<R: FlagReg, F: Fn(R) -> bool>(
+        &self,
+        f: F,
+        interval: Duration,
+        try_count: Option<usize>,
+    ) -> Result<(), IgbError> {
+        for _ in 0..try_count.unwrap_or(usize::MAX) {
+            if f(self.read_reg::<R>()) {
+                return Ok(());
+            }
+
+            sleep(interval);
         }
+        Err(IgbError::Timeout)
     }
 
     /// Disable all interrupts for all queues.
@@ -146,6 +151,21 @@ impl FlagReg for CTRL {
 }
 
 bitflags! {
+    pub struct STATUS: u32 {
+        const FD = 0x00000001;  // Full duplex. 0=half; 1=full
+        const LU = 1 << 1;
+        const LAN_ID = 1 << 2;
+        const TXOFF = 1 << 4;
+        const SPEED = 1 << 6;
+        const PHYRA = 1 << 10;
+    }
+}
+
+impl FlagReg for STATUS {
+    const REG: u32 = 0x00008;
+}
+
+bitflags! {
     pub struct RCTL: u32 {
         const RST  = 0x00000001;        // Software reset
         const RXEN = 0x00000002;        // Receiver Enable. 0=disabled; 1=enabled
@@ -181,4 +201,47 @@ bitflags! {
 
 impl FlagReg for RCTL {
     const REG: u32 = 0x00100;
+}
+
+bitflags! {
+    pub struct MDIC: u32 {
+        const DATA = 0xFFFF;
+        const REGADD = 0b11111 << 16;
+        const PHYADD = 0b11111 << 21;
+        const OP_WRITE = 0x04000000;
+        const OP_READ = 0x08000000;
+        const READY = 1 << 28;
+        const I = 1 << 29;
+        const E = 1 << 30;
+        const Destination = 1 << 31;
+    }
+}
+
+impl FlagReg for MDIC {
+    const REG: u32 = 0x00020;
+}
+
+bitflags! {
+    pub struct SWSM: u32 {
+        const SMBI = 1;
+        const SWESMBI = 1<<1;
+        const WMNG =1<<2;
+        const EEUR = 1<<3;
+    }
+}
+
+impl FlagReg for SWSM {
+    const REG: u32 = 0x05B50;
+}
+
+bitflags! {
+    pub struct SwFwSync: u32 {
+        const SW_EEP_SM = 1;
+        const SW_PHY_SM0 = 1 << 1;
+        const SW_PHY_SM1 = 1 << 2;
+    }
+}
+
+impl FlagReg for SwFwSync {
+    const REG: u32 = 0x05B5C;
 }
