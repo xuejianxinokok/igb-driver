@@ -132,15 +132,21 @@ impl<H: IgbHal, const QS: usize> NicDevice<H> for IgbDevice<H, QS> {
 
     /// Returns the link speed of this device.
     fn get_link_speed(&self) -> u16 {
-        let speed = self.get_reg32(IGB_LINKS);
+        let speed = self.get_reg32(IGB_STATUS);
+
+        let speed_raw = (speed >> 6) & 0b11;
+
         if (speed & IGB_LINKS_UP) == 0 {
+            info!("STATUS:{:032b},  {:08b} no link established",  speed,speed as u8); //status: 80080481, no link up
             return 0;
         }
-        match speed & IGB_LINKS_SPEED_82599 {
-            IGB_LINKS_SPEED_100_82599 => 100,
-            IGB_LINKS_SPEED_1G_82599 => 1000,
-            IGB_LINKS_SPEED_10G_82599 => 10000,
-            _ => 0,
+
+        info!("status: {:x},link up", speed);
+        match speed_raw {
+            0 => 10,
+            1 => 100,
+            0b10 => 1000,
+            _ => 1000,
         }
     }
 
@@ -531,9 +537,9 @@ impl<H: IgbHal, const QS: usize> IgbDevice<H, QS> {
 // Private methods implementation
 impl<H: IgbHal, const QS: usize> IgbDevice<H, QS> {
     /// Resets and initializes the device. section 4.5.3
-   
+
     fn reset_and_init(&mut self, pool: &Arc<MemPool>) -> IgbResult {
-        /*参考文档 4.5.3 Initialization Sequence
+        /*参考文档 4.5.3 Initialization Sequence, 8.1.3 Register Summary
         The following sequence of commands is typically issued to device by the software device driver in order
         to initialize the 82576 to normal operation. The major initialization steps are:
         • 1. Disable Interrupts - see Interrupts during initialization.
@@ -544,7 +550,7 @@ impl<H: IgbHal, const QS: usize> IgbDevice<H, QS> {
         • 5. Initialize Receive - see Receive Initialization.
         • 6. Initialize Transmit - see Transmit Initialization.
         • 7. Enable Interrupts - see Interrupts during initialization.
-        
+
          */
         info!("resetting device igb device");
         //ixgbe section 4.6.3.1 - disable all interrupts p523寄存器地址
@@ -554,8 +560,19 @@ impl<H: IgbHal, const QS: usize> IgbDevice<H, QS> {
         info!("--->step 1");
         // ixgbe section 4.6.3.2
         // igb Issue Global Reset and perform General Configuration
-        self.set_reg32(IGB_CTRL, IGB_CTRL_RST_MASK);
-        self.wait_clear_reg32(IGB_CTRL, IGB_CTRL_RST_MASK);
+        // 8.2.1 Device Control Register - CTRL (0x00000; R/W)
+        // Several values in the Device Control Register (CTRL) need to be set, upon power up, or after a device
+        // reset for normal operation.
+        // • FD should be set per interface negotiation (if done in software), or is set by the hardware if the
+        // interface is Auto-Negotiating. This is reflected in the Device Status Register in the Auto-Negotiating
+        // case.
+        // • Speed is determined via Auto-Negotiation by the PHY, Auto-Negotiation by the PCS layer in SGMII/
+        // SerDes mode, or forced by software if the link is forced. Status information for speed is also
+        // readable in STATUS.
+        // • ILOS should normally be set to 0
+
+        self.global_reset();
+
         info!("--->step 2 ");
         // TODO: sleep 10 millis.
         let _ = H::wait_until(Duration::from_millis(1000));
@@ -564,11 +581,8 @@ impl<H: IgbHal, const QS: usize> IgbDevice<H, QS> {
 
         self.disable_interrupts();
 
-        let mac = self.get_mac_addr();
-        info!(
-            "mac address: {:02x}:{:02x}:{:02x}:{:02x}:{:02x}:{:02x}",
-            mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]
-        );
+        self.set_flags32(IGB_CTRL_EXT, 1 << 28);
+        self.wait_set_reg32(IGB_CTRL_EXT, 1 << 28);
 
         // section 4.6.3 - wait for EEPROM auto read completion
         //self.wait_set_reg32(IGB_EEC, IGB_EEC_ARD);
@@ -580,12 +594,12 @@ impl<H: IgbHal, const QS: usize> IgbDevice<H, QS> {
         // section 4.6.3 Enable interrupts.
 
         // section 4.6.4 - initialize link (auto negotiation)
-        //self.init_link();
+        self.init_link();
         info!("--->step 3 ");
 
         // section 4.6.5 - statistical counters
         // reset-on-read registers, just read them once
-        //self.reset_stats();
+        self.reset_stats();
         info!("--->step 4 ");
 
         // section 4.6.7 - init rx
@@ -606,15 +620,40 @@ impl<H: IgbHal, const QS: usize> IgbDevice<H, QS> {
 
         // enable promisc mode by default to make testing easier
         //self.set_promisc(true);
+        // 开启中断
+        self.clear_interrupts();
+
+        // CTRL::SLU | CTRL::FD | CTRL::SPD_1000 | CTRL::FRCDPX | CTRL::FRCSPD
+        self.set_reg32(
+            IGB_CTRL,
+            0x1 << 6 | 0x00000001 | 0x00000200 | 0x00001000 | 0x00000800,
+        );
 
         // wait some time for the link to come up
         self.wait_for_link();
-        
+
+        let mac = self.get_mac_addr();
+        info!(
+            "mac address: {:02x}:{:02x}:{:02x}:{:02x}:{:02x}:{:02x}",
+            mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]
+        );
 
         info!("Success to initialize and reset Intel 1G NIC regs.");
         //开启中断
 
         Ok(())
+    }
+
+    fn global_reset(&mut self) {
+        //self.set_reg32(IGB_CTRL, IGB_CTRL_RST_MASK);
+        //self.wait_clear_reg32(IGB_CTRL, IGB_CTRL_RST_MASK);
+
+        self.set_reg32(IGB_CTRL, IGB_CTRL_GLOBAL_RST);
+
+        //let current = self.get_reg32(IGB_CTRL);
+        //trace!("IGB_CTRL_GLOBAL_RST:{:b} current: {:b}", IGB_CTRL_GLOBAL_RST,current);
+
+        self.wait_clear_reg32(IGB_CTRL, IGB_CTRL_GLOBAL_RST);
     }
 
     // sections 4.6.7
@@ -643,13 +682,13 @@ impl<H: IgbHal, const QS: usize> IgbDevice<H, QS> {
         for i in 0..self.num_rx_queues {
             info!("initializing rx queue {}", i);
             // enable advanced rx descriptors
-            self.set_reg32(
-                IGB_SRRCTL(u32::from(i)),
-                (self.get_reg32(IGB_SRRCTL(u32::from(i))) & !IGB_SRRCTL_DESCTYPE_MASK)
-                    | IGB_SRRCTL_DESCTYPE_ADV_ONEBUF,
-            );
-            // let nic drop packets if no rx descriptor is available instead of buffering them
-            self.set_flags32(IGB_SRRCTL(u32::from(i)), IGB_SRRCTL_DROP_EN);
+            // self.set_reg32(
+            //     IGB_SRRCTL(u32::from(i)),
+            //     (self.get_reg32(IGB_SRRCTL(u32::from(i))) & !IGB_SRRCTL_DESCTYPE_MASK)
+            //         | IGB_SRRCTL_DESCTYPE_ADV_ONEBUF,
+            // );
+            // // let nic drop packets if no rx descriptor is available instead of buffering them
+            // self.set_flags32(IGB_SRRCTL(u32::from(i)), IGB_SRRCTL_DROP_EN);
 
             assert_eq!(mem::size_of::<AdvancedTxDescriptor>(), 16);
             // section 7.1.9 - setup descriptor ring
@@ -692,12 +731,12 @@ impl<H: IgbHal, const QS: usize> IgbDevice<H, QS> {
         }
 
         // last sentence of section 4.6.7 - set some magic bits
-        self.set_flags32(IGB_CTRL_EXT, IGB_CTRL_EXT_NS_DIS);
+        //self.set_flags32(IGB_CTRL_EXT, IGB_CTRL_EXT_NS_DIS);
 
         // probably a broken feature, this flag is initialized with 1 but has to be set to 0
-        for i in 0..self.num_rx_queues {
-            self.clear_flags32(IGB_DCA_RXCTRL(u32::from(i)), 1 << 12);
-        }
+        // for i in 0..self.num_rx_queues {
+        //     self.clear_flags32(IGB_DCA_RXCTRL(u32::from(i)), 1 << 12);
+        // }
 
         // start rx
         self.set_flags32(IGB_RXCTRL, IGB_RXCTRL_RXEN);
@@ -710,17 +749,17 @@ impl<H: IgbHal, const QS: usize> IgbDevice<H, QS> {
     #[allow(clippy::needless_range_loop)]
     fn init_tx(&mut self) -> IgbResult {
         // crc offload and small packet padding
-        self.set_flags32(IGB_HLREG0, IGB_HLREG0_TXCRCEN | IGB_HLREG0_TXPADEN);
+        //self.set_flags32(IGB_HLREG0, IGB_HLREG0_TXCRCEN | IGB_HLREG0_TXPADEN);
 
         // section 4.6.11.3.4 - set default buffer size allocations
-        self.set_reg32(IGB_TXPBSIZE(0), IGB_TXPBSIZE_40KB);
-        for i in 1..8 {
-            self.set_reg32(IGB_TXPBSIZE(i), 0xff);
-        }
+        // self.set_reg32(IGB_TXPBSIZE(0), IGB_TXPBSIZE_40KB);
+        // for i in 1..8 {
+        //     self.set_reg32(IGB_TXPBSIZE(i), 0xff);
+        // }
 
         // required when not using DCB/VTd
-        self.set_reg32(IGB_DTXMXSZRQ, 0xffff);
-        self.clear_flags32(IGB_RTTDCS, IGB_RTTDCS_ARBDIS);
+        // self.set_reg32(IGB_DTXMXSZRQ, 0xffff);
+        // self.clear_flags32(IGB_RTTDCS, IGB_RTTDCS_ARBDIS);
 
         // configure queues
         for i in 0..self.num_tx_queues {
@@ -845,7 +884,7 @@ impl<H: IgbHal, const QS: usize> IgbDevice<H, QS> {
 
         // enable queue and wait if necessary
         self.set_flags32(IGB_TXDCTL(u32::from(queue_id)), IGB_TXDCTL_ENABLE);
-        //self.wait_set_reg32(IGB_TXDCTL(u32::from(queue_id)), IGB_TXDCTL_ENABLE);
+        self.wait_set_reg32(IGB_TXDCTL(u32::from(queue_id)), IGB_TXDCTL_ENABLE);
 
         Ok(())
     }
@@ -853,26 +892,77 @@ impl<H: IgbHal, const QS: usize> IgbDevice<H, QS> {
     // see section 4.6.4
     /// Initializes the link of this device.
     fn init_link(&self) {
+        // 3.5.7.8.3.16 PHY Address
+        // The PHY address for MDl0 accesses is 00001b
+
+        // 8.2.4 MDI Control Register - MDIC (0x00020; R/W)
+        // 8.25.1PHY Control Register-PCTRL(00d; R/W)
+        // 与phy通信是通过MDI，通过操作MDIC寄存器可以对phy的寄存器进行读写，phy也有多个寄存器
+        // MDID 中的addr 固定为1 在以下地址说明
+        // 3.5.7.8.3.16PHY Address
+        // The PHY address for MDl0 accesses is 00001b
+
+        const OP_WRITE: u32 = 0x1 << 26; //0x04000000;
+        const OP_READ: u32 = 0x1 << 27; // 0x08000000;
+        const READY: u32 = 1 << 28;
+
+        // 读取并打印原始值
+        let mii_reg = self.get_reg32(IGB_MDIC);
+        info!("mii_reg0: {:x} , {:032b}", mii_reg, mii_reg);
+
+        // 需要根据目标PHYREG的地址和操作类型（读/写）构造MDIC寄存器的值。
+        const READ: u32 = (0 << 16) | (1 << 21) | OP_READ;
+        // 使用set_reg32方法将构造好的MDIC寄存器值写入硬件，以启动操作。写入后的MDIC寄存器将告知PHY设备准备好进行操作
+        self.set_flags32(IGB_MDIC, READ);
+
+        // 读取写入的数据
+        //let  mii_reg = self.get_reg32(IGB_MDIC) ;
+        //info!("READ: {:032b} , mii_reg00:{:032b}", READ, mii_reg);
+
+        //由于MDIC操作通常是异步的，因此需要等待操作完成。通过读取MDIC寄存器并检查是否设置了READY标志，确定操作是否成功完成。如果没有设置READY，则继续等待
+        self.wait_set_reg32(IGB_MDIC, READY);
+
+        // 获取返回的结果数据
+        let mut mii_reg = self.get_reg32(IGB_MDIC) as u16;
+        info!("mii_reg1: {:x} , {:016b}", mii_reg, mii_reg);
+
+        //通知phy上电 第11位设置为0
+        mii_reg &= !0x0800;
+
+        info!("mii_reg2: {:x} , {:016b}", mii_reg, mii_reg);
+
+        let wv = (0 << 16) | (1 << 21) | (mii_reg as u32) | OP_WRITE;
+        self.set_flags32(IGB_MDIC, wv);
+        self.wait_set_reg32(IGB_MDIC, READY);
+
+        // 再次读取验证
+        // 使用set_reg32方法将构造好的MDIC寄存器值写入硬件，以启动操作。写入后的MDIC寄存器将告知PHY设备准备好进行操作
+        // self.set_reg32(IGB_MDIC, READ);
+        // self.wait_set_reg32(IGB_MDIC, READY);
+        // let  mii_reg = self.get_reg32(IGB_MDIC) ;
+        // info!("mii_reg3: {:x} , {:016b}", mii_reg, mii_reg);
+
         // link auto-configuration register should already be set correctly, we're resetting it anyway
-        self.set_reg32(
-            IGB_AUTOC,
-            (self.get_reg32(IGB_AUTOC) & !IGB_AUTOC_LMS_MASK) | IGB_AUTOC_LMS_10G_SERIAL,
-        );
-        self.set_reg32(
-            IGB_AUTOC,
-            (self.get_reg32(IGB_AUTOC) & !IGB_AUTOC_10G_PMA_PMD_MASK) | IGB_AUTOC_10G_XAUI,
-        );
-        // negotiate link
-        self.set_flags32(IGB_AUTOC, IGB_AUTOC_AN_RESTART);
+        // self.set_reg32(
+        //     IGB_AUTOC,
+        //     (self.get_reg32(IGB_AUTOC) & !IGB_AUTOC_LMS_MASK) | IGB_AUTOC_LMS_10G_SERIAL,
+        // );
+        // self.set_reg32(
+        //     IGB_AUTOC,
+        //     (self.get_reg32(IGB_AUTOC) & !IGB_AUTOC_10G_PMA_PMD_MASK) | IGB_AUTOC_10G_XAUI,
+        // );
+        // // negotiate link
+        // self.set_flags32(IGB_AUTOC, IGB_AUTOC_AN_RESTART);
         // datasheet wants us to wait for the link here, but we can continue and wait afterwards
     }
 
     /// Disable all interrupts for all queues.
+    /// 8.1.3 Register Summary
+    /// 8.8.10 Interrupt Mask Clear Register - IMC (0x0150C; WO)
     fn disable_interrupts(&self) {
         // Clear interrupt mask to stop from interrupts being generated
         //self.set_reg32(IGB_EIMS, 0x0000_0000);
         //self.clear_interrupts();
-
         self.set_reg32(IGB_IMS, 0x0000_0000);
         self.clear_interrupts();
     }
@@ -903,17 +993,17 @@ impl<H: IgbHal, const QS: usize> IgbDevice<H, QS> {
 
     /// Waits for the link to come up.
     fn wait_for_link(&self) {
-        //#[cfg(target_arch = "x86_64")]
-        //{
-            info!("waiting for link");
-            let _ = H::wait_until(Duration::from_secs(10));
-            let mut speed = self.get_link_speed();
-            while speed == 0 {
-                let _ = H::wait_until(Duration::from_millis(100));
-                speed = self.get_link_speed();
-            }
-            info!("link speed is {} Mbit/s", self.get_link_speed());
-        //}
+        info!("waiting for link");
+
+        //let _ = H::wait_until(Duration::from_secs(10));
+        let mut speed = self.get_link_speed();
+        let mut i = 0;
+        while speed == 0 && i < 10 {
+            let _ = H::wait_until(Duration::from_secs(1));
+            speed = self.get_link_speed();
+            i = i + 1;
+        }
+        info!("link speed is {} Mbit/s", self.get_link_speed());
     }
 
     /// Enables or disables promisc mode of this device.
@@ -965,6 +1055,12 @@ impl<H: IgbHal, const QS: usize> IgbDevice<H, QS> {
     fn wait_clear_reg32(&self, reg: u32, value: u32) {
         loop {
             let current = self.get_reg32(reg);
+            trace!(
+                "wait_clear_reg32: value:{:b},current&value:{:b}  current: {:b}",
+                value,
+                current & value,
+                current
+            );
             if (current & value) == 0 {
                 break;
             }
@@ -978,6 +1074,12 @@ impl<H: IgbHal, const QS: usize> IgbDevice<H, QS> {
     fn wait_set_reg32(&self, reg: u32, value: u32) {
         loop {
             let current = self.get_reg32(reg);
+            trace!(
+                "wait_set_reg32: value:{:032b},current&value:{:032b}  current: {:032b}",
+                value,
+                current & value,
+                current
+            );
             if (current & value) == value {
                 break;
             }

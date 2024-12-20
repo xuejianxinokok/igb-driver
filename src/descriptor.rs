@@ -64,7 +64,7 @@ impl AdvancedRxDescriptor {
     ///
     /// # Arguments
     /// * `packet_buffer_address`: starting physical address of the receive buffer.
-    pub fn  set_packet_address(&mut self, packet_buffer_address: u64) {
+    pub fn set_packet_address(&mut self, packet_buffer_address: u64) {
         self.packet_buffer_address.write(packet_buffer_address);
     }
 

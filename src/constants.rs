@@ -126,6 +126,7 @@ pub fn IGB_BY_MAC(_hw: u32, _r: u32) -> u32 {
 
 /* General Registers */
 pub const IGB_CTRL: u32 = 0x00000;
+pub const IGB_MDIC: u32 = 0x00020;
 pub const IGB_STATUS: u32 = 0x00008;
 pub const IGB_CTRL_EXT: u32 = 0x00018;
 pub const IGB_ESDP: u32 = 0x00020;
@@ -308,7 +309,6 @@ pub const IGB_ICS: u32 = 0x01504; //Interrupt Cause Set
 pub const IGB_IMS: u32 = 0x01508; //Interrupt Mask Set/Read
 pub const IGB_IMC: u32 = 0x0150C; //Interrupt Mask Clear
 
-
 pub fn IGB_EICS_EX(i: u32) -> u32 {
     0x00A90 + i * 4
 }
@@ -392,46 +392,56 @@ pub const IGB_TFCS: u32 = 0x0CE00;
 
 /* Receive DMA Registers */
 pub fn IGB_RDBAL(i: u32) -> u32 {
-    if i < 64 {
-        0x01000 + i * 0x40
-    } else {
-        0x0D000 + ((i - 64) * 0x40)
-    }
+    // if i < 64 {
+    //     0x01000 + i * 0x40
+    // } else {
+    //     0x0D000 + ((i - 64) * 0x40)
+    // }
+
+    0x0C000 + i * 0x40
 }
 pub fn IGB_RDBAH(i: u32) -> u32 {
-    if i < 64 {
-        0x01004 + i * 0x40
-    } else {
-        0x0D004 + ((i - 64) * 0x40)
-    }
+    // if i < 64 {
+    //     0x01004 + i * 0x40
+    // } else {
+    //     0x0D004 + ((i - 64) * 0x40)
+    // }
+
+    0x0C004 + i * 0x40
 }
 pub fn IGB_RDLEN(i: u32) -> u32 {
-    if i < 64 {
-        0x01008 + i * 0x40
-    } else {
-        0x0D008 + ((i - 64) * 0x40)
-    }
+    // if i < 64 {
+    //     0x01008 + i * 0x40
+    // } else {
+    //     0x0D008 + ((i - 64) * 0x40)
+    // }
+    0x0C008 + i * 0x40
 }
 pub fn IGB_RDH(i: u32) -> u32 {
-    if i < 64 {
-        0x01010 + i * 0x40
-    } else {
-        0x0D010 + ((i - 64) * 0x40)
-    }
+    // if i < 64 {
+    //     0x01010 + i * 0x40
+    // } else {
+    //     0x0D010 + ((i - 64) * 0x40)
+    // }
+
+    0x0C010 + i * 0x40
 }
 pub fn IGB_RDT(i: u32) -> u32 {
-    if i < 64 {
-        0x01018 + i * 0x40
-    } else {
-        0x0D018 + ((i - 64) * 0x40)
-    }
+    //if i < 64 {
+    0x0C018 + i * 0x40
+    //} else {
+    //    0x0D018 + ((i - 64) * 0x40)
+    //}
 }
+// 8.10.10 Receive Descriptor Control - RXDCTL (0x0C028 + 0x40*n [n=0...15]; R/W)
 pub fn IGB_RXDCTL(i: u32) -> u32 {
-    if i < 64 {
-        0x01028 + i * 0x40
-    } else {
-        0x0D028 + ((i - 64) * 0x40)
-    }
+    // if i < 64 {
+    //     0x01028 + i * 0x40
+    // } else {
+    //     0x0D028 + ((i - 64) * 0x40)
+    // }
+
+    0x0C028 + i * 0x40
 }
 pub fn IGB_RSCCTL(i: u32) -> u32 {
     if i < 64 {
@@ -482,7 +492,8 @@ pub fn IGB_RXPBSIZE(i: u32) -> u32 {
     0x03C00 + i * 4
 }
 
-pub const IGB_RXCTRL: u32 = 0x03000;
+pub const IGB_RXCTRL: u32 = 0x00100; // 0x03000;
+
 pub const IGB_DROPEN: u32 = 0x03D04;
 pub const IGB_RXPBSIZE_SHIFT: u32 = 10;
 pub const IGB_RXPBSIZE_MASK: u32 = 0x000FFC00;
@@ -500,18 +511,30 @@ pub fn IGB_MTA(i: u32) -> u32 {
 }
 
 pub fn IGB_RAL(i: u32) -> u32 {
+    // if i <= 15 {
+    //     0x05400 + i * 8
+    // } else {
+    //     0x0A200 + i * 8
+    // }
+
     if i <= 15 {
         0x05400 + i * 8
     } else {
-        0x0A200 + i * 8
+        0x054E0 + (i - 16) * 8
     }
 }
 
 pub fn IGB_RAH(i: u32) -> u32 {
+    // if i <= 15 {
+    //     0x05404 + i * 8
+    // } else {
+    //     0x0A204 + i * 8
+    // }
+
     if i <= 15 {
         0x05404 + i * 8
     } else {
-        0x0A204 + i * 8
+        0x054E4 + (i - 16) * 8
     }
 }
 
@@ -714,26 +737,28 @@ pub const IGB_FDIRCMD: u32 = 0x0EE2C;
 
 /* Transmit DMA registers */
 pub fn IGB_TDBAL(i: u32) -> u32 {
-    0x06000 + i * 0x40
+    0xE000 + i * 0x40
 } /* 32 of them (0-31)*/
 pub fn IGB_TDBAH(i: u32) -> u32 {
-    0x06004 + i * 0x40
+    0x0E004 + i * 0x40
 }
 
 pub fn IGB_TDLEN(i: u32) -> u32 {
-    0x06008 + i * 0x40
+    0x0E008 + i * 0x40 //0x06008
 }
 
 pub fn IGB_TDH(i: u32) -> u32 {
-    0x06010 + i * 0x40
+    // 0x06010 + i * 0x40
+    0x0E010 + i * 0x40
 }
 
 pub fn IGB_TDT(i: u32) -> u32 {
-    0x06018 + i * 0x40
+    // 0x06018 + i * 0x40
+    0x0E018 + i * 0x40
 }
 
 pub fn IGB_TXDCTL(i: u32) -> u32 {
-    0x06028 + i * 0x40
+    0x0E028 + i * 0x40
 }
 
 pub fn IGB_TDWBAL(i: u32) -> u32 {
@@ -1895,8 +1920,10 @@ pub const IGB_PSRTYPE_RQPL_SHIFT: u32 = 29;
 pub const IGB_CTRL_GIO_DIS: u32 = 0x00000004; /* Global IO Master Disable bit */
 //pub const IGB_CTRL_LNK_RST: u32 = 0x00000008; /* Link Reset. Resets everything. */
 pub const IGB_CTRL_RST: u32 = 0x04000000; /* Reset (SW) 1<<26*/
-pub const IGB_CTRL_PHY_RST: u32 = 0x80000000 ; /* PHY Reset. 1<<31 */
+pub const IGB_CTRL_PHY_RST: u32 = 0x80000000; /* PHY Reset. 1<<31 */
 pub const IGB_CTRL_RST_MASK: u32 = IGB_CTRL_PHY_RST | IGB_CTRL_RST;
+
+pub const IGB_CTRL_GLOBAL_RST: u32 = 0x1 << 26; // 0x04000000;
 
 /* FACTPS */
 pub const IGB_FACTPS_MNGCG: u32 = 0x20000000; /* Manageblility Clock Gated */
@@ -2714,7 +2741,8 @@ pub const IGB_MMNGC_MNG_VETO: u32 = 0x00000001;
 
 /* LINKS Bit Masks */
 pub const IGB_LINKS_KX_AN_COMP: u32 = 0x80000000;
-pub const IGB_LINKS_UP: u32 = 0x40000000;
+pub const IGB_LINKS_UP: u32 = 0x1 << 1;
+
 pub const IGB_LINKS_SPEED: u32 = 0x20000000;
 pub const IGB_LINKS_MODE: u32 = 0x18000000;
 pub const IGB_LINKS_RX_MODE: u32 = 0x06000000;
@@ -3054,7 +3082,7 @@ pub const IGB_TDWBAL_HEAD_WB_ENABLE: u32 = 0x1; /* Tx head write-back enable */
 pub const IGB_TDWBAL_SEQNUM_WB_ENABLE: u32 = 0x2; /* Tx seq# write-back enable */
 
 /* Receive Config masks */
-pub const IGB_RXCTRL_RXEN: u32 = 0x00000001; /* Enable Receiver */
+pub const IGB_RXCTRL_RXEN: u32 = 0x00000002; // 0x00000001; /* Enable Receiver */
 pub const IGB_RXCTRL_DMBYPS: u32 = 0x00000002; /* Desc Monitor Bypass */
 pub const IGB_RXDCTL_ENABLE: u32 = 0x02000000; /* Ena specific Rx Queue */
 pub const IGB_RXDCTL_SWFLSH: u32 = 0x04000000; /* Rx Desc wr-bk flushing */

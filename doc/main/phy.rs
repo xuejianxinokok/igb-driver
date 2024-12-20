@@ -22,7 +22,7 @@ impl Phy {
     }
 
     pub fn read_mdic(&self, offset: u32) -> Result<u16, IgbError> {
-        let mut mdic = MDIC::from_bits_retain((offset << 16) | (self.addr << 21)) | MDIC::OP_READ;
+        let mut mdic = MDIC::from_bits_retain((offset << 16) | (self.addr << 21)) | MDIC::OP_READ; // 0x08000000;
         self.reg.write_reg(mdic);
 
         loop {
@@ -63,8 +63,8 @@ impl Phy {
     }
 
     pub fn power_up(&self) -> Result<(), IgbError> {
-        let mut mii_reg = self.read_mdic(PHY_CONTROL)?;
-        mii_reg &= !MII_CR_POWER_DOWN;
+        let mut mii_reg = self.read_mdic(PHY_CONTROL)?; //0
+        mii_reg &= !MII_CR_POWER_DOWN; //0x0800
         self.write_mdic(PHY_CONTROL, mii_reg)
     }
 }

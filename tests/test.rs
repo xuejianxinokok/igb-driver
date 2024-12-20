@@ -8,14 +8,14 @@ extern crate alloc;
 
 use bare_test::{driver::device_tree::get_device_tree, fdt::PciSpace, mem::mmu::iomap, println};
 use core::ptr::NonNull;
-use igb_driver::{IgbDevice, IgbHal, MemPool, NicDevice, PhysAddr as IgbPhysAddr,IgbNetBuf};
+use igb_driver::{IgbDevice, IgbHal, IgbNetBuf, MemPool, NicDevice, PhysAddr as IgbPhysAddr};
 use log::{debug, info};
 use pcie::*;
 
 use alloc::alloc::{alloc, dealloc};
+use core::arch::asm;
 use core::mem;
 use core::time::Duration;
-use core::arch::asm;
 
 bare_test::test_setup!();
 
@@ -25,7 +25,7 @@ fn it_works1() {
     assert_eq!(1, 1);
 }
 
-const MEM_POOL: usize = 4096;
+const MEM_POOL: usize = 4096 * 2;
 const MEM_POOL_ENTRY_SIZE: usize = 2048;
 const QS: usize = 16;
 const QN: u16 = 2;
@@ -41,12 +41,11 @@ fn test_igb() {
     //初始化设置
     let inner =
         IgbDevice::<TestIgbHalImpl, QS>::init(addr.addr().into(), len, QN, QN, &mem_pool).unwrap();
-    // 如何测试发包  https://github.com/ixy-languages/ixy.rs/blob/master/examples/generator.rs    
+    // 如何测试发包  https://github.com/ixy-languages/ixy.rs/blob/master/examples/generator.rs
     // https://github.com/lispking/rust-e1000-driver/blob/main/src/e1000/e1000.rs
     // 目前没搞定
     //let tx_buf= IgbNetBuf::alloc(pool, size);
     //inner.send(0, tx_buf);
-    
 }
 
 /// 只用于测试的 IgbHal 实现
@@ -93,7 +92,8 @@ unsafe impl IgbHal for TestIgbHalImpl {
         let freq = Self::get_timer_frequency();
 
         // 将 Duration 转换为计时器周期数（tick 数）
-        let target_ticks = duration.as_secs() * freq + duration.subsec_nanos() as u64 * freq / 1_000_000_000;
+        let target_ticks =
+            duration.as_secs() * freq + duration.subsec_nanos() as u64 * freq / 1_000_000_000;
 
         // 获取当前计时器计数
         let start_ticks = Self::get_timer_count();
@@ -105,7 +105,7 @@ unsafe impl IgbHal for TestIgbHalImpl {
                 asm!("nop");
             }
         }
-    
+
         Ok(())
     }
 }
@@ -135,7 +135,6 @@ impl TestIgbHalImpl {
         freq
     }
 }
-
 
 fn get_igb() -> (usize, usize) {
     let fdt = get_device_tree().unwrap();
