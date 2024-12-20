@@ -624,7 +624,7 @@ impl<H: IgbHal, const QS: usize> IgbDevice<H, QS> {
         self.clear_interrupts();
 
         // CTRL::SLU | CTRL::FD | CTRL::SPD_1000 | CTRL::FRCDPX | CTRL::FRCSPD
-        self.set_reg32(
+        self.set_flags32(
             IGB_CTRL,
             0x1 << 6 | 0x00000001 | 0x00000200 | 0x00001000 | 0x00000800,
         );
@@ -739,7 +739,7 @@ impl<H: IgbHal, const QS: usize> IgbDevice<H, QS> {
         // }
 
         // start rx
-        self.set_flags32(IGB_RXCTRL, IGB_RXCTRL_RXEN);
+        self.set_flags32(IGB_RXCTRL, IGB_RXCTRL_RXEN|IGB_RXCTRL_BAM);
 
         Ok(())
     }

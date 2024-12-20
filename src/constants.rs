@@ -3083,6 +3083,7 @@ pub const IGB_TDWBAL_SEQNUM_WB_ENABLE: u32 = 0x2; /* Tx seq# write-back enable *
 
 /* Receive Config masks */
 pub const IGB_RXCTRL_RXEN: u32 = 0x00000002; // 0x00000001; /* Enable Receiver */
+pub const IGB_RXCTRL_BAM: u32 = 0x1<<15; // Broadcast Accept Mode.
 pub const IGB_RXCTRL_DMBYPS: u32 = 0x00000002; /* Desc Monitor Bypass */
 pub const IGB_RXDCTL_ENABLE: u32 = 0x02000000; /* Ena specific Rx Queue */
 pub const IGB_RXDCTL_SWFLSH: u32 = 0x04000000; /* Rx Desc wr-bk flushing */
